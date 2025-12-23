@@ -10,7 +10,7 @@ let geojsonLayer = null;
 let geoJSONCache = null;
 let drugSet = new Set();
 
-// 顏色分級函數
+// 顏色分級
 function getColor(d) {
     return d > 100 ? '#800026' :
            d > 50  ? '#BD0026' :
@@ -29,10 +29,10 @@ async function init() {
     const statusText = document.getElementById('status-text');
     const fileCount = 16; 
 
-    // A. 載入 CSV 檔案 (使用 PapaParse)
+    // A. 載入 CSV 檔案 (確保不使用 fetch.json() 避免錯誤)
     for (let i = 1; i <= fileCount; i++) {
         const fileName = `drug_data${i}.csv?t=${new Date().getTime()}`;
-        if (statusText) statusText.innerText = `正在載入數據: ${i}/${fileCount}`;
+        if (statusText) statusText.innerText = `正在讀取資料檔: ${i}/${fileCount}`;
 
         await new Promise(resolve => {
             Papa.parse(fileName, {
@@ -40,20 +40,20 @@ async function init() {
                 header: true,
                 skipEmptyLines: true,
                 complete: (results) => {
-                    if (results.data) {
+                    if (results.data && results.data.length > 0) {
                         allData = allData.concat(results.data);
                     }
                     resolve();
                 },
                 error: (err) => {
-                    console.warn(`${fileName} 載入跳過`, err);
+                    console.warn(`跳過檔案 drug_data${i}.csv，可能不存在或路徑錯誤。`);
                     resolve(); 
                 }
             });
         });
     }
 
-    // 更新毒品選單
+    // 建立毒品種類下拉選單
     allData.forEach(row => {
         const kind = row['kind'] || row['毒品品項'];
         if (kind) drugSet.add(kind.trim());
@@ -70,20 +70,25 @@ async function init() {
         select.addEventListener('change', renderMap);
     }
 
-    // B. 載入 GeoJSON (這是最容易報 JSON 錯誤的地方)
-    if (statusText) statusText.innerText = "正在繪製地圖...";
+    // B. 載入 GeoJSON (加入嚴格檢查防止解析 HTML 錯誤頁面)
+    if (statusText) statusText.innerText = "正在繪製地圖圖層...";
     try {
         const geoRes = await fetch('https://raw.githubusercontent.com/g0v/tw-town-geojson/master/twtown20140529.json');
         
-        // 檢查回應是否成功，避免解析 404 HTML 導致 JSON 錯誤
-        if (!geoRes.ok) throw new Error('無法取得地圖邊界檔案');
-        
+        // 如果回應不正常（如 404），不要執行 .json()
+        if (!geoRes.ok) throw new Error('地圖邊界檔案下載失敗');
+
+        const contentType = geoRes.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            throw new Error('收到的內容不是 JSON 格式');
+        }
+
         geoJSONCache = await geoRes.json();
         renderMap();
-        if (statusText) statusText.innerText = "完成";
+        if (statusText) statusText.innerText = `完成！共載入 ${allData.length} 筆資料`;
     } catch (e) {
-        console.error("JSON 解析錯誤:", e);
-        if (statusText) statusText.innerText = "地圖載入失敗，請重新整理頁面。";
+        console.error("地圖載入錯誤:", e.message);
+        if (statusText) statusText.innerText = "地圖圖層載入失敗，請檢查網路。";
     }
 }
 
