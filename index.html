@@ -2,8 +2,7 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>台灣吸菸行為數據儀表板</title>
+    <title>台灣吸菸行為監測</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://unpkg.com/topojson@3"></script>
@@ -11,7 +10,7 @@
 <body>
     <div class="dashboard">
         <aside class="sidebar">
-            <h2>📊 數據選單</h2>
+            <h2>📊 數據篩選</h2>
             <div class="control-group">
                 <label>觀察對象</label>
                 <select id="popSelect">
@@ -24,20 +23,11 @@
                 <label>統計年份</label>
                 <select id="yearSelect"></select>
             </div>
-            <div class="control-group">
-                <label>性別</label>
-                <select id="genderSelect">
-                    <option value="overall">整體</option>
-                    <option value="male">男性</option>
-                    <option value="female">女性</option>
-                </select>
-            </div>
             <div class="info-card">
-                <p>全台平均參考值</p>
+                <p>全台平均值</p>
                 <h2 id="avg-value">--</h2>
             </div>
         </aside>
-
         <main class="main-content">
             <div id="map"></div>
             <div class="legend">

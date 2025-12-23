@@ -1,0 +1,15 @@
+body, html { margin: 0; height: 100%; font-family: sans-serif; background: #f4f7f6; }
+.dashboard { display: flex; height: 100vh; }
+.sidebar { width: 260px; background: white; padding: 20px; box-shadow: 2px 0 10px rgba(0,0,0,0.1); z-index: 10; }
+.control-group { margin-bottom: 20px; }
+label { display: block; font-weight: bold; margin-bottom: 5px; color: #666; }
+select { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ddd; }
+.info-card { margin-top: 30px; padding: 15px; background: #fff5f5; border-left: 5px solid #e74c3c; border-radius: 8px; }
+#avg-value { color: #e74c3c; margin: 5px 0 0 0; }
+.main-content { flex-grow: 1; position: relative; background: white; }
+#map { width: 100%; height: 100%; }
+.county { stroke: #fff; stroke-width: 0.5; cursor: pointer; }
+.tooltip { position: absolute; display: none; padding: 10px; background: rgba(0,0,0,0.8); color: #fff; border-radius: 5px; pointer-events: none; }
+.legend { position: absolute; bottom: 20px; right: 20px; background: white; padding: 10px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+#legend-bar { width: 120px; height: 10px; background: linear-gradient(to right, #fee5d9, #de2d26); }
+.legend-labels { display: flex; justify-content: space-between; font-size: 12px; margin-top: 5px; }
