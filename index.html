@@ -1,26 +1,26 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>台灣毒品案件分布地圖</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台灣毒品案件分佈地圖</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="style.css">
-    <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
-    <div id="controls">
-        <label for="drug-select">選擇毒品名稱：</label>
-        <select id="drug-select"></select>
-    </div>
-
-    <div id="map-container">
-        <svg id="map"></svg>
-        <div id="tooltip" class="hidden">
-            <p><span id="city-name"></span></p>
-            <p>案件數量: <span id="case-count"></span></p>
+    <div id="control-panel">
+        <h2>案件數量分佈</h2>
+        <label for="drug-select">選擇毒品類型：</label>
+        <select id="drug-select">
+            </select>
+        <div id="legend">
+            <h4>案件量區間</h4>
+            <div id="legend-items"></div>
         </div>
-        <div id="legend"></div>
     </div>
+    <div id="map"></div>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
