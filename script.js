@@ -8,7 +8,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap'
 }).addTo(map);
 
-// 2. 顏色級別 (根據案件量)
+// 2. 顏色級別
 function getColor(d) {
     return d > 300 ? '#800026' :
            d > 100 ? '#BD0026' :
@@ -19,8 +19,9 @@ function getColor(d) {
 }
 
 function style(feature) {
-    // 同時相容多種 GeoJSON 的欄位名稱
-    const cityName = feature.properties.COUNTYNAME || feature.properties.name || feature.properties.C_Name;
+    // 兼容不同的 GeoJSON 欄位名 (COUNTYNAME, name, C_Name)
+    const props = feature.properties;
+    const cityName = props.COUNTYNAME || props.name || props.C_Name || "";
     const selectedDrug = document.getElementById('drug-select').value;
     const count = (drugStats[cityName] && drugStats[cityName][selectedDrug]) || 0;
     
@@ -30,17 +31,18 @@ function style(feature) {
     };
 }
 
+// 3. 主要執行邏輯
 async function init() {
     const statusEl = document.getElementById('status');
     
-    // A. 載入 CSV 數據 (1-16)
+    // A. 載入 CSV 數據
     const filePromises = [];
     for (let i = 1; i <= 16; i++) {
         filePromises.push(fetchCSV(`drug_data${i}.csv`));
     }
     await Promise.all(filePromises);
     
-    // 填充下拉選單
+    // 生成選單
     const select = document.getElementById('drug-select');
     Array.from(allDrugKinds).sort().forEach(kind => {
         if (kind) {
@@ -51,13 +53,20 @@ async function init() {
         }
     });
 
-    // B. 載入地圖 (優先讀取本機檔案)
+    // B. 載入地圖 (讀取你上傳到 repo 的 taiwan.json)
     try {
-        // 嘗試讀取你上傳到 repo 的 taiwan.json，若失敗則抓取網路備份
-        const geoResponse = await fetch('taiwan.json');
-        if (!geoResponse.ok) throw new Error('Local GeoJSON not found');
+        const response = await fetch('taiwan.json');
         
-        const geoData = await geoResponse.json();
+        // 檢查回應是否正常 (防止 404 HTML)
+        if (!response.ok) throw new Error(`找不到 taiwan.json (HTTP ${response.status})`);
+        
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            console.error("收到的內容不是 JSON:", await response.text());
+            throw new Error("檔案格式錯誤，請確認 taiwan.json 內容是否正確");
+        }
+
+        const geoData = await response.json();
 
         geojsonLayer = L.geoJson(geoData, {
             style: style,
@@ -66,7 +75,8 @@ async function init() {
                     mouseover: (e) => {
                         const l = e.target;
                         l.setStyle({ weight: 3, color: '#333' });
-                        const cityName = feature.properties.COUNTYNAME || feature.properties.name || feature.properties.C_Name;
+                        const props = feature.properties;
+                        const cityName = props.COUNTYNAME || props.name || props.C_Name || "未知";
                         const selected = document.getElementById('drug-select').value;
                         const count = (drugStats[cityName] && drugStats[cityName][selected]) || 0;
                         l.bindTooltip(`<b>${cityName}</b><br>${selected}: ${count} 案`).openTooltip();
@@ -82,8 +92,8 @@ async function init() {
         updateLegend();
 
     } catch (err) {
-        console.error("地圖載入失敗:", err);
-        statusEl.innerText = "地圖檔案載入失敗，請確認資料夾中有 taiwan.json";
+        console.error("地圖載入失敗:", err.message);
+        statusEl.innerText = `地圖載入失敗: ${err.message}`;
     }
 }
 
@@ -104,7 +114,7 @@ function fetchCSV(url) {
 
 function processData(data) {
     data.forEach(row => {
-        // 跳過 CSV 標頭行 (英文標頭 no, type 或 中文標頭 編號, 案類)
+        // 跳過 CSV 標頭行
         if (!row.oc_addr || row.oc_addr === "發生地點" || row.no === "編號") return;
 
         const city = row.oc_addr.substring(0, 3);
@@ -125,15 +135,13 @@ function updateLegend() {
     legendDiv.innerHTML = "<strong>案件量範圍</strong><br>";
     for (let i = 0; i < grades.length; i++) {
         legendDiv.innerHTML +=
-            '<i style="background:' + getColor(grades[i] + 1) + '; width:18px; height:18px; display:inline-block; margin-right:5px;"></i> ' +
+            '<i style="background:' + getColor(grades[i] + 1) + '; width:18px; height:18px; display:inline-block; margin-right:5px; vertical-align:middle;"></i> ' +
             grades[i] + (grades[i + 1] ? '&ndash;' + grades[i + 1] + '<br>' : '+');
     }
 }
 
 document.getElementById('drug-select').addEventListener('change', () => {
-    if (geojsonLayer) {
-        geojsonLayer.setStyle(style);
-    }
+    if (geojsonLayer) geojsonLayer.setStyle(style);
 });
 
 init();
