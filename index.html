@@ -1,73 +1,45 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>台灣吸菸行為數據監測儀表板</title>
+    <title>台灣吸菸行為數據視覺化地圖</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script src="https://unpkg.com/topojson@3"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
 </head>
 <body>
-    <div class="dashboard">
-        <aside class="sidebar">
-            <h2>📊 數據篩選</h2>
-            
-            <div class="control-group">
-                <label>觀察對象</label>
-                <select id="popSelect">
-                    <option value="adult">15歲以上成人</option>
-                    <option value="highschool">高中職學生</option>
-                    <option value="junior">國中學生</option>
+    <div class="container">
+        <header>
+            <h1>台灣吸菸行為數據功能地圖</h1>
+            <div class="controls">
+                <select id="dataType">
+                    <option value="highschool">高中職生吸菸率</option>
+                    <option value="juniorhigh">國中生吸菸率</option>
+                    <option value="adult">15歲以上平均支數</option>
                 </select>
             </div>
+        </header>
 
-            <div class="control-group">
-                <label>菸品種類</label>
-                <select id="productSelect">
-                    <option value="cigarette">傳統紙菸</option>
-                    <option value="evape">電子煙</option>
-                </select>
-            </div>
-
-            <div class="control-group">
-                <label>統計年份</label>
-                <select id="yearSelect"></select>
-            </div>
-
-            <div class="control-group">
-                <label>性別</label>
-                <select id="genderSelect">
-                    <option value="overall">整體</option>
-                    <option value="male">男性</option>
-                    <option value="female">女性</option>
-                </select>
-            </div>
-
-            <div class="info-card">
-                <p id="data-desc">選取上方選項以查看數據分佈</p>
-                <div class="stat-highlight">
-                    <span id="avg-label">全台平均</span>
-                    <h2 id="avg-value">--</h2>
-                </div>
-            </div>
-        </aside>
-
-        <main class="main-content">
+        <main>
             <div id="map-container">
-                <div id="map"></div>
-                <div class="legend">
-                    <div id="legend-bar"></div>
-                    <div class="legend-labels">
-                        <span>低</span>
-                        <span>高</span>
-                    </div>
+                <svg id="taiwan-map"></svg>
+                <div id="tooltip" class="hidden"></div>
+            </div>
+
+            <div id="chart-container">
+                <div class="card">
+                    <h3>數據趨勢分析</h3>
+                    <canvas id="trendChart"></canvas>
+                </div>
+                <div class="card" id="details">
+                    <h3>縣市詳細數據</h3>
+                    <div id="city-info">請點擊地圖查看詳細資訊</div>
                 </div>
             </div>
         </main>
     </div>
-
-    <div class="tooltip" id="tooltip"></div>
     <script src="script.js"></script>
 </body>
 </html>
