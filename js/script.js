@@ -1,14 +1,25 @@
 document.addEventListener("DOMContentLoaded", function() {
+    // 定義畫布尺寸
+    const width = 800;
+    const height = 750;
+
     const svg = d3.select("#map").append("svg")
-        .attr("viewBox", "0 0 800 750").attr("preserveAspectRatio", "xMidYMid meet");
+        .attr("viewBox", `0 0 ${width} ${height}`)
+        .attr("preserveAspectRatio", "xMidYMid meet");
     
     const tooltip = d3.select("#tooltip");
-    const projection = d3.geoMercator().center([121, 24.3]).scale(10000).translate([400, 375]);
+
+    // 地圖投影設定：縮小 scale 並置中 translate
+    const projection = d3.geoMercator()
+        .center([121, 24.3]) 
+        .scale(8000)          // 縮小地圖比例 (原為 10000)
+        .translate([width / 2, height / 2]); // 置中於 SVG 畫布
+
     const path = d3.geoPath().projection(projection);
 
     let rawData, geoData;
 
-    // 載入預處理後的 JSON 數據與地圖
+    // 載入資料 (相對路徑)
     Promise.all([
         d3.json("./data/taiwan.json"),
         d3.json("./data/data.json")
@@ -19,7 +30,10 @@ document.addEventListener("DOMContentLoaded", function() {
         d3.select("#popSelect").on("change", renderOptions);
         d3.select("#yearSelect").on("change", updateMap);
         renderOptions();
-    }).catch(err => console.error("資料載入失敗，請檢查 ./data/ 路徑", err));
+    }).catch(err => {
+        console.error("載入失敗:", err);
+        alert("資料載入失敗，請確認是否已生成 data/data.json");
+    });
 
     function renderOptions() {
         const pop = d3.select("#popSelect").property("value");
@@ -44,8 +58,11 @@ document.addEventListener("DOMContentLoaded", function() {
                              .domain([0, d3.max(rawData[pop], d => d.value) || 1]);
 
         const counties = svg.selectAll(".county").data(geoData.features);
-        counties.enter().append("path").attr("class", "county")
-            .merge(counties).transition().duration(400)
+
+        counties.enter().append("path")
+            .attr("class", "county")
+            .merge(counties)
+            .transition().duration(400)
             .attr("d", path)
             .attr("fill", d => {
                 const name = d.properties.COUNTYNAME.replace("台", "臺");
@@ -53,14 +70,18 @@ document.addEventListener("DOMContentLoaded", function() {
             });
 
         svg.selectAll(".county")
+            .on("mouseover", function() { d3.select(this).style("stroke", "#333").style("stroke-width", "1.5"); })
             .on("mousemove", (event, d) => {
                 const name = d.properties.COUNTYNAME.replace("台", "臺");
                 const val = dataMap.get(name);
                 tooltip.style("display", "block")
                        .style("left", (event.pageX + 15) + "px")
                        .style("top", (event.pageY - 20) + "px")
-                       .html(`<strong>${name}</strong><br>數值: ${val ? val.toFixed(2) + unit : '無資料'}`);
+                       .html(`<strong>${name}</strong><br>${year}年數據: ${val ? val.toFixed(2) + unit : '無資料'}`);
             })
-            .on("mouseout", () => tooltip.style("display", "none"));
+            .on("mouseout", function() {
+                d3.select(this).style("stroke", "#fff").style("stroke-width", "0.5");
+                tooltip.style("display", "none");
+            });
     }
 });

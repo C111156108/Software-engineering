@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <title>台灣吸菸行為監測儀表板</title>
+    <title>台灣吸菸行為數據監測</title>
     <link rel="stylesheet" href="./css/style.css">
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://unpkg.com/topojson@3"></script>
@@ -24,12 +24,13 @@
                 <select id="yearSelect"></select>
             </div>
             <div class="info-card">
-                <p>全台平均參考值</p>
+                <p>全台年度平均</p>
                 <h2 id="avg-value">--</h2>
             </div>
         </aside>
         <main class="main-content">
             <div id="map"></div>
+            
             <div class="legend">
                 <div id="legend-bar"></div>
                 <div class="legend-labels"><span>低</span><span>高</span></div>
