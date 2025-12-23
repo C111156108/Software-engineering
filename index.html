@@ -1,39 +1,42 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>台灣毒品案件分佈地圖</title>
-    
-    <link rel="icon" href="data:,">
-
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    
+    <title>台灣吸菸行為地理分佈圖</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/topojson@3"></script>
 </head>
 <body>
 
-    <div id="control-panel">
-        <h3 style="margin:0 0 10px 0">毒品案件分佈地圖</h3>
-        <div id="status">數據載入中...</div>
-        
-        <label for="drug-select">選擇毒品類型：</label>
-        <select id="drug-select">
-            <option value="全部">全部</option>
-        </select>
-
-        <div id="legend">
-            <strong>案件數量間距</strong>
-            <div id="legend-items"></div>
+    <div class="header">
+        <h1>台灣 15 歲以上吸菸者每天平均吸菸支數</h1>
+        <div class="controls">
+            <div class="control-group">
+                <label for="yearSelect">統計年份：</label>
+                <select id="yearSelect"></select>
+            </div>
+            <div class="control-group">
+                <label for="genderSelect">性別篩選：</label>
+                <select id="genderSelect">
+                    <option value="overall">整體</option>
+                    <option value="male">男性</option>
+                    <option value="female">女性</option>
+                </select>
+            </div>
         </div>
     </div>
 
-    <div id="map"></div>
+    <div class="main-container">
+        <div id="map-container">
+            <div id="map"></div>
+            <div id="legend"></div>
+        </div>
+    </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/topojson-client@3"></script>
+    <div class="tooltip" id="tooltip"></div>
+
     <script src="script.js"></script>
 </body>
 </html>

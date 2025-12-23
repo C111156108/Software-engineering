@@ -1,137 +1,89 @@
-let map, geojsonLayer;
-let drugStats = {}; 
-let allDrugKinds = new Set();
+// 設定地圖大小
+const width = 700;
+const height = 750;
 
-// 1. 初始化地圖
-map = L.map('map').setView([23.6, 121], 7);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap'
-}).addTo(map);
+const svg = d3.select("#map")
+    .append("svg")
+    .attr("width", width)
+    .attr("height", height);
 
-// 2. 顏色分級
-function getColor(d) {
-    return d > 300 ? '#800026' :
-           d > 100 ? '#BD0026' :
-           d > 50  ? '#E31A1C' :
-           d > 20  ? '#FC4E2A' :
-           d > 10  ? '#FD8D3C' :
-           d > 0   ? '#FEB24C' : '#FFEDA0';
-}
+const tooltip = d3.select("#tooltip");
 
-function style(feature) {
-    const cityName = feature.properties.COUNTYNAME || feature.properties.name || "";
-    const selectedDrug = document.getElementById('drug-select').value;
-    const count = (drugStats[cityName] && drugStats[cityName][selectedDrug]) || 0;
+// 1. 設定地圖投影 (針對台灣優化)
+const projection = d3.geoMercator()
+    .center([121, 24.3]) 
+    .scale(10000)
+    .translate([width / 2, height / 2]);
+
+const path = d3.geoPath().projection(projection);
+
+// 2. 載入資料
+Promise.all([
+    d3.json("taiwan.json"),
+    d3.csv("15歲以上吸菸者每天平均吸菸支數.csv")
+]).then(([topoData, csvData]) => {
     
-    return {
-        fillColor: getColor(count),
-        weight: 1.5, opacity: 1, color: 'white', fillOpacity: 0.7
-    };
-}
-
-// 3. 主要邏輯
-async function init() {
-    const statusEl = document.getElementById('status');
-    
-    // A. 載入 CSV (1-16)
-    const filePromises = [];
-    for (let i = 1; i <= 16; i++) {
-        filePromises.push(fetchCSV(`drug_data${i}.csv`));
-    }
-    await Promise.all(filePromises);
-    
-    // 更新下拉選單
-    const select = document.getElementById('drug-select');
-    Array.from(allDrugKinds).sort().forEach(kind => {
-        if (kind) {
-            const opt = document.createElement('option');
-            opt.value = kind;
-            opt.textContent = kind;
-            select.appendChild(opt);
-        }
+    // 預處理 CSV 資料：清洗縣市名稱並轉為數字
+    csvData.forEach(d => {
+        d.countyName = d.分析項目.replace("現住地縣市別=", "");
+        d.overall = +d["整體吸菸者平均吸菸支數之平均值(支)"];
+        d.male = +d["男性吸菸者平均吸菸支數之平均值(支)"];
+        d.female = +d["女性吸菸者平均吸菸支數之平均值(支)"];
     });
 
-    // B. 載入並轉換 TopoJSON
-    try {
-        const response = await fetch('taiwan.json');
-        if (!response.ok) throw new Error("找不到檔案");
-        const topoData = await response.json();
+    // 初始化年份選單 (只抓取有縣市數據的年份)
+    const years = Array.from(new Set(csvData.filter(d => d.分析項目.includes("=")).map(d => d.年度)));
+    const yearSelect = d3.select("#yearSelect");
+    years.forEach(y => yearSelect.append("option").text(y).attr("value", y));
 
-        // 【核心修正】將 TopoJSON 轉換為 GeoJSON，指定讀取 layer1
-        const geoData = topojson.feature(topoData, topoData.objects.layer1);
+    // 轉換 TopoJSON 為 GeoJSON (假設物件名稱為 layer1)
+    const geojson = topojson.feature(topoData, topoData.objects.layer1);
 
-        geojsonLayer = L.geoJson(geoData, {
-            style: style,
-            onEachFeature: (feature, layer) => {
-                layer.on({
-                    mouseover: (e) => {
-                        const l = e.target;
-                        l.setStyle({ weight: 3, color: '#333' });
-                        const cityName = feature.properties.COUNTYNAME || feature.properties.name || "";
-                        const selected = document.getElementById('drug-select').value;
-                        const count = (drugStats[cityName] && drugStats[cityName][selected]) || 0;
-                        l.bindTooltip(`<b>${cityName}</b><br>${selected}: ${count} 案`).openTooltip();
-                    },
-                    mouseout: (e) => {
-                        if (geojsonLayer) geojsonLayer.resetStyle(e.target);
-                    }
-                });
-            }
-        }).addTo(map);
+    // 繪製函數
+    function draw() {
+        const selectedYear = d3.select("#yearSelect").property("value");
+        const selectedGender = d3.select("#genderSelect").property("value");
 
-        statusEl.style.display = 'none';
-        updateLegend();
+        // 過濾當前年份數據
+        const currentData = csvData.filter(d => d.年度 === selectedYear);
+        const dataMap = new Map(currentData.map(d => [d.countyName, d[selectedGender]]));
 
-    } catch (err) {
-        console.error(err);
-        statusEl.innerText = "載入失敗: " + err.message;
+        // 設定顏色比例尺 (紅色系)
+        const maxVal = d3.max(csvData.filter(d => d.分析項目.includes("=")), d => d[selectedGender]);
+        const colorScale = d3.scaleSequential(d3.interpolateYlOrRd)
+            .domain([0, maxVal]);
+
+        // 綁定數據
+        const paths = svg.selectAll(".county").data(geojson.features);
+
+        paths.enter()
+            .append("path")
+            .attr("class", "county")
+            .merge(paths)
+            .attr("d", path)
+            .attr("fill", d => {
+                const name = d.properties.COUNTYNAME || d.properties.name;
+                const val = dataMap.get(name);
+                return val ? colorScale(val) : "#eee";
+            })
+            .on("mousemove", (event, d) => {
+                const name = d.properties.COUNTYNAME || d.properties.name;
+                const val = dataMap.get(name) || "無數據";
+                tooltip.style("display", "block")
+                    .style("left", (event.pageX + 15) + "px")
+                    .style("top", (event.pageY - 15) + "px")
+                    .html(`<strong>${name}</strong><br>平均吸菸支數: ${val} 支`);
+            })
+            .on("mouseout", () => tooltip.style("display", "none"));
     }
-}
 
-function fetchCSV(url) {
-    return new Promise((resolve) => {
-        Papa.parse(url, {
-            download: true, header: true, skipEmptyLines: true,
-            complete: function(results) {
-                processData(results.data);
-                resolve();
-            },
-            error: function() { resolve(); } 
-        });
-    });
-}
+    // 監聽選單變動
+    d3.select("#yearSelect").on("change", draw);
+    d3.select("#genderSelect").on("change", draw);
 
-function processData(data) {
-    data.forEach(row => {
-        // 跳過標頭與空行
-        if (!row.oc_addr || row.oc_addr === "發生地點" || row.no === "編號") return;
+    // 初始執行
+    draw();
 
-        // 【重要】統一將「臺」轉為「台」，以匹配你的 taiwan.json 屬性
-        const city = row.oc_addr.substring(0, 3).replace('臺', '台');
-        const kind = row.kind ? row.kind.trim() : "未知";
-
-        if (!drugStats[city]) drugStats[city] = { "全部": 0 };
-        if (!drugStats[city][kind]) drugStats[city][kind] = 0;
-
-        drugStats[city][kind]++;
-        drugStats[city]["全部"]++;
-        allDrugKinds.add(kind);
-    });
-}
-
-function updateLegend() {
-    const grades = [0, 10, 20, 50, 100, 300];
-    const div = document.getElementById('legend-items');
-    div.innerHTML = "";
-    for (let i = 0; i < grades.length; i++) {
-        div.innerHTML +=
-            '<i class="legend-i" style="background:' + getColor(grades[i] + 1) + '"></i> ' +
-            grades[i] + (grades[i + 1] ? '&ndash;' + grades[i + 1] + '<br>' : '+');
-    }
-}
-
-document.getElementById('drug-select').addEventListener('change', () => {
-    if (geojsonLayer) geojsonLayer.setStyle(style);
+}).catch(err => {
+    console.error("載入檔案失敗，請檢查檔案名稱是否正確：", err);
 });
-
-init();
