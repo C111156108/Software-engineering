@@ -1,126 +1,117 @@
-// 1. 初始化地圖
-const map = L.map('map').setView([23.6, 121.0], 7);
+const geoJsonUrl = "https://raw.githubusercontent.com/g0v/twgeojson/master/twCounty2010.geo.json";
+const dataUrl = "drug_stats.json";
 
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OpenStreetMap contributors'
-}).addTo(map);
+let drugData = {};
+let geoData = null;
 
-let allData = [];
-let geojsonLayer = null;
-let geoJSONCache = null;
-let drugSet = new Set();
+// 初始化 SVG
+const svg = d3.select("#map");
+const width = window.innerWidth;
+const height = window.innerHeight;
 
-// 顏色分級
-function getColor(d) {
-    return d > 100 ? '#800026' :
-           d > 50  ? '#BD0026' :
-           d > 20  ? '#E31A1C' :
-           d > 10  ? '#FC4E2A' :
-           d > 5   ? '#FD8D3C' :
-           d > 0   ? '#FEB24C' : '#FFEDA0';
-}
+const projection = d3.geoMercator()
+    .center([121, 24])
+    .scale(8000)
+    .translate([width / 2, height / 2]);
 
-function fixText(str) {
-    if (!str) return "";
-    return str.replace(/台/g, '臺').trim();
-}
+const path = d3.geoPath().projection(projection);
+
+// 顏色比例尺 (紅色系，越多越深)
+const colorScale = d3.scaleSequential(d3.interpolateReds);
 
 async function init() {
-    const statusText = document.getElementById('status-text');
-    const fileCount = 16; 
-
-    // A. 載入 CSV 檔案 (確保不使用 fetch.json() 避免錯誤)
-    for (let i = 1; i <= fileCount; i++) {
-        const fileName = `drug_data${i}.csv?t=${new Date().getTime()}`;
-        if (statusText) statusText.innerText = `正在讀取資料檔: ${i}/${fileCount}`;
-
-        await new Promise(resolve => {
-            Papa.parse(fileName, {
-                download: true,
-                header: true,
-                skipEmptyLines: true,
-                complete: (results) => {
-                    if (results.data && results.data.length > 0) {
-                        allData = allData.concat(results.data);
-                    }
-                    resolve();
-                },
-                error: (err) => {
-                    console.warn(`跳過檔案 drug_data${i}.csv，可能不存在或路徑錯誤。`);
-                    resolve(); 
-                }
-            });
-        });
-    }
-
-    // 建立毒品種類下拉選單
-    allData.forEach(row => {
-        const kind = row['kind'] || row['毒品品項'];
-        if (kind) drugSet.add(kind.trim());
-    });
-
-    const select = document.getElementById('drug-select');
-    if (select) {
-        Array.from(drugSet).sort().forEach(kind => {
-            const opt = document.createElement('option');
-            opt.value = kind;
-            opt.innerText = kind;
-            select.appendChild(opt);
-        });
-        select.addEventListener('change', renderMap);
-    }
-
-    // B. 載入 GeoJSON (加入嚴格檢查防止解析 HTML 錯誤頁面)
-    if (statusText) statusText.innerText = "正在繪製地圖圖層...";
     try {
-        const geoRes = await fetch('https://raw.githubusercontent.com/g0v/tw-town-geojson/master/twtown20140529.json');
-        
-        // 如果回應不正常（如 404），不要執行 .json()
-        if (!geoRes.ok) throw new Error('地圖邊界檔案下載失敗');
+        // 載入資料
+        const [geoRes, statsRes] = await Promise.all([
+            d3.json(geoJsonUrl),
+            d3.json(dataUrl)
+        ]);
 
-        const contentType = geoRes.headers.get("content-type");
-        if (!contentType || !contentType.includes("application/json")) {
-            throw new Error('收到的內容不是 JSON 格式');
-        }
+        geoData = geoRes;
+        drugData = statsRes.data;
 
-        geoJSONCache = await geoRes.json();
-        renderMap();
-        if (statusText) statusText.innerText = `完成！共載入 ${allData.length} 筆資料`;
-    } catch (e) {
-        console.error("地圖載入錯誤:", e.message);
-        if (statusText) statusText.innerText = "地圖圖層載入失敗，請檢查網路。";
+        // 設定下拉選單
+        const select = d3.select("#drug-select");
+        statsRes.options.forEach(opt => {
+            select.append("option").text(opt).attr("value", opt);
+        });
+
+        select.on("change", function() {
+            updateMap(this.value);
+        });
+
+        // 首次繪製
+        drawBaseMap();
+        updateMap("全部");
+
+    } catch (err) {
+        console.error("載入失敗:", err);
     }
 }
 
-function renderMap() {
-    const selectedDrug = document.getElementById('drug-select').value;
-    const counts = {};
+function drawBaseMap() {
+    svg.selectAll("path")
+        .data(geoData.features)
+        .enter()
+        .append("path")
+        .attr("class", "county")
+        .attr("d", path)
+        .on("mousemove", function(event, d) {
+            const cityName = d.properties.COUNTYNAME;
+            const currentDrug = d3.select("#drug-select").property("value");
+            const count = (drugData[cityName] && drugData[cityName][currentDrug]) || 0;
 
-    allData.forEach(item => {
-        const itemKind = item['kind'] || item['毒品品項'];
-        if (selectedDrug === "全部" || itemKind === selectedDrug) {
-            const addr = fixText(item['oc_addr'] || item['發生地點']);
-            const region = addr.substring(0, 6); 
-            if (region.length >= 5) {
-                counts[region] = (counts[region] || 0) + 1;
-            }
-        }
+            d3.select("#tooltip")
+                .classed("hidden", false)
+                .style("left", (event.pageX + 10) + "px")
+                .style("top", (event.pageY + 10) + "px");
+            
+            d3.select("#city-name").text(cityName);
+            d3.select("#case-count").text(count);
+        })
+        .on("mouseout", function() {
+            d3.select("#tooltip").classed("hidden", true);
+        });
+}
+
+function updateMap(drugName) {
+    // 找出目前選取毒品的最高案件數以設定顏色範圍
+    let maxVal = 0;
+    Object.values(drugData).forEach(cityObj => {
+        if (cityObj[drugName]) maxVal = Math.max(maxVal, cityObj[drugName]);
     });
 
-    if (geojsonLayer) map.removeLayer(geojsonLayer);
+    colorScale.domain([0, maxVal || 1]);
 
-    geojsonLayer = L.geoJson(geoJSONCache, {
-        style: (feature) => {
-            const fullName = fixText(feature.properties.C_Name + feature.properties.T_Name);
-            const c = counts[fullName] || 0;
-            return { fillColor: getColor(c), weight: 1, color: 'white', fillOpacity: 0.7 };
-        },
-        onEachFeature: (feature, layer) => {
-            const fullName = feature.properties.C_Name + feature.properties.T_Name;
-            const c = counts[fixText(fullName)] || 0;
-            layer.bindPopup(`<b>${fullName}</b><br>案件數: ${c} 筆`);
-        }
-    }).addTo(map);
+    svg.selectAll(".county")
+        .transition()
+        .duration(500)
+        .attr("fill", d => {
+            const cityName = d.properties.COUNTYNAME;
+            const count = (drugData[cityName] && drugData[cityName][drugName]) || 0;
+            return count === 0 ? "#eee" : colorScale(count);
+        });
+
+    updateLegend(maxVal);
 }
+
+function updateLegend(maxVal) {
+    const legend = d3.select("#legend");
+    legend.html("<strong>案件量圖例</strong><br>");
+    
+    const steps = 5;
+    for (let i = 0; i <= steps; i++) {
+        const val = Math.round((maxVal / steps) * i);
+        const color = colorScale(val);
+        legend.append("div")
+            .attr("class", "legend-item")
+            .html(`<div class="legend-color" style="background:${color}"></div> <span>${val}</span>`);
+    }
+}
+
+window.addEventListener("resize", () => {
+    // 簡單的重繪邏輯或更新 viewBox
+    location.reload(); 
+});
 
 init();

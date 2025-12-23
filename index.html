@@ -1,33 +1,26 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>台灣毒品案件分佈監測地圖</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <title>台灣毒品案件分布地圖</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
-
-    <div id="control-panel">
-        <h2>毒品分佈監測</h2>
-        <div class="filter-group">
-            <label for="drug-select">篩選毒品種類：</label>
-            <select id="drug-select">
-                <option value="全部">全部顯示</option>
-            </select>
-        </div>
-        <div id="status-box">
-            <p id="status-text">準備載入資料...</p>
-            <div id="progress-bar"><div id="progress-fill"></div></div>
-        </div>
-        <div id="summary"></div>
+    <div id="controls">
+        <label for="drug-select">選擇毒品名稱：</label>
+        <select id="drug-select"></select>
     </div>
 
-    <div id="map"></div>
+    <div id="map-container">
+        <svg id="map"></svg>
+        <div id="tooltip" class="hidden">
+            <p><span id="city-name"></span></p>
+            <p>案件數量: <span id="case-count"></span></p>
+        </div>
+        <div id="legend"></div>
+    </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
