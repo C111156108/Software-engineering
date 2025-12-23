@@ -8,7 +8,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap'
 }).addTo(map);
 
-// 2. 顏色級別 (根據案件量)
+// 2. 顏色分級
 function getColor(d) {
     return d > 300 ? '#800026' :
            d > 100 ? '#BD0026' :
@@ -29,18 +29,18 @@ function style(feature) {
     };
 }
 
-// 3. 主要執行邏輯
+// 3. 主要邏輯
 async function init() {
     const statusEl = document.getElementById('status');
     
-    // A. 載入 1-16 個 CSV
+    // A. 載入 CSV (1-16)
     const filePromises = [];
     for (let i = 1; i <= 16; i++) {
         filePromises.push(fetchCSV(`drug_data${i}.csv`));
     }
     await Promise.all(filePromises);
     
-    // 生成選單
+    // 更新下拉選單
     const select = document.getElementById('drug-select');
     Array.from(allDrugKinds).sort().forEach(kind => {
         if (kind) {
@@ -51,13 +51,13 @@ async function init() {
         }
     });
 
-    // B. 載入並轉換地圖
+    // B. 載入並轉換 TopoJSON
     try {
         const response = await fetch('taiwan.json');
-        if (!response.ok) throw new Error("找不到 taiwan.json");
+        if (!response.ok) throw new Error("找不到檔案");
         const topoData = await response.json();
 
-        // 使用 topojson-client 進行轉換
+        // 【核心修正】將 TopoJSON 轉換為 GeoJSON，指定讀取 layer1
         const geoData = topojson.feature(topoData, topoData.objects.layer1);
 
         geojsonLayer = L.geoJson(geoData, {
@@ -84,7 +84,7 @@ async function init() {
 
     } catch (err) {
         console.error(err);
-        statusEl.innerText = "地圖載入失敗: " + err.message;
+        statusEl.innerText = "載入失敗: " + err.message;
     }
 }
 
@@ -103,9 +103,10 @@ function fetchCSV(url) {
 
 function processData(data) {
     data.forEach(row => {
+        // 跳過標頭與空行
         if (!row.oc_addr || row.oc_addr === "發生地點" || row.no === "編號") return;
 
-        // 統一將「臺」轉為「台」以匹配地圖 JSON
+        // 【重要】統一將「臺」轉為「台」，以匹配你的 taiwan.json 屬性
         const city = row.oc_addr.substring(0, 3).replace('臺', '台');
         const kind = row.kind ? row.kind.trim() : "未知";
 
