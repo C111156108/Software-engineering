@@ -1,25 +1,25 @@
 let map, geojsonLayer;
-let drugStats = {}; // 格式: { "臺北市": { "安非他命": 10, "全部": 100 }, ... }
+let drugStats = {}; 
 let allDrugKinds = new Set();
 
 // 1. 初始化地圖
 map = L.map('map').setView([23.6, 121], 7);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors'
+L.tileLayer('https://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap'
 }).addTo(map);
 
-// 2. 顏色分級函數
+// 2. 定義案件量顏色 (越多越深)
 function getColor(d) {
-    return d > 500 ? '#800026' :
-           d > 200 ? '#BD0026' :
-           d > 100 ? '#E31A1C' :
-           d > 50  ? '#FC4E2A' :
-           d > 20  ? '#FD8D3C' :
-           d > 10  ? '#FEB24C' :
+    return d > 300 ? '#800026' :
+           d > 100 ? '#BD0026' :
+           d > 50  ? '#E31A1C' :
+           d > 20  ? '#FC4E2A' :
+           d > 10  ? '#FD8D3C' :
+           d > 5   ? '#FEB24C' :
            d > 0   ? '#FED976' : '#FFEDA0';
 }
 
-// 3. 處理樣式
+// 3. 地圖樣式設定
 function style(feature) {
     const cityName = feature.properties.COUNTYNAME;
     const selectedDrug = document.getElementById('drug-select').value;
@@ -27,64 +27,62 @@ function style(feature) {
     
     return {
         fillColor: getColor(count),
-        weight: 2,
+        weight: 1.5,
         opacity: 1,
         color: 'white',
-        dashArray: '3',
-        fillOpacity: 0.7
+        fillOpacity: 0.8
     };
 }
 
-// 4. 主要執行邏輯
+// 4. 解析數據邏輯
 async function init() {
     const statusEl = document.getElementById('status');
     
-    // A. 載入 16 個 CSV (這裡使用迴圈嘗試抓取)
+    // 批次讀取 drug_data1.csv 到 drug_data16.csv
     const filePromises = [];
     for (let i = 1; i <= 16; i++) {
         filePromises.push(fetchCSV(`drug_data${i}.csv`));
     }
 
-    statusEl.innerText = "正在解析數據...";
     await Promise.all(filePromises);
     
-    // B. 更新選單
+    // 生成下拉選單
     const select = document.getElementById('drug-select');
     Array.from(allDrugKinds).sort().forEach(kind => {
-        const opt = document.createElement('option');
-        opt.value = kind;
-        opt.innerHTML = kind;
-        select.appendChild(opt);
+        if(kind && kind !== "毒品品項") { // 過濾掉標頭列
+            const opt = document.createElement('option');
+            opt.value = kind;
+            opt.innerHTML = kind;
+            select.appendChild(opt);
+        }
     });
 
-    // C. 載入地圖邊界 (GeoJSON)
+    // 載入台灣地圖邊界 (GeoJSON)
     const geoRes = await fetch('https://raw.githubusercontent.com/g0v/twgeojson/master/json/counties.json');
     const geoData = await geoRes.json();
 
-    statusEl.innerText = "地圖繪製中...";
-    
     geojsonLayer = L.geoJson(geoData, {
         style: style,
         onEachFeature: (feature, layer) => {
             layer.on({
                 mouseover: (e) => {
                     const l = e.target;
-                    l.setStyle({ weight: 5, color: '#666', dashArray: '' });
+                    l.setStyle({ weight: 3, color: '#333' });
                     const cityName = feature.properties.COUNTYNAME;
                     const selected = document.getElementById('drug-select').value;
                     const count = (drugStats[cityName] && drugStats[cityName][selected]) || 0;
-                    l.bindTooltip(`${cityName}<br>${selected}: ${count} 案`).openTooltip();
+                    l.bindTooltip(`<b>${cityName}</b><br>${selected}: ${count} 案`).openTooltip();
                 },
                 mouseout: (e) => { geojsonLayer.resetStyle(e.target); }
             });
         }
     }).addTo(map);
 
-    statusEl.innerText = "完成";
-    setTimeout(() => statusEl.style.display = 'none', 3000);
+    updateLegend();
+    statusEl.innerText = "數據載入完成";
+    setTimeout(() => statusEl.style.opacity = '0', 2000);
 }
 
-// 解析單個 CSV 檔案
 function fetchCSV(url) {
     return new Promise((resolve) => {
         Papa.parse(url, {
@@ -95,22 +93,18 @@ function fetchCSV(url) {
                 processData(results.data);
                 resolve();
             },
-            error: function() {
-                console.log(`跳過不存在或錯誤的檔案: ${url}`);
-                resolve();
-            }
+            error: function() { resolve(); } // 忽略找不到檔案的錯誤
         });
     });
 }
 
-// 彙整數據到 drugStats
 function processData(data) {
     data.forEach(row => {
-        // 跳過 CSV 的第二行中文欄位描述 (如果 PapaParse 沒濾掉的話)
-        if (row['案類'] === '案類' || !row['發生地點']) return;
+        // 抓取 oc_addr (發生地點) 與 kind (毒品品項)
+        if (!row.oc_addr || row.oc_addr === "發生地點") return;
 
-        const city = row['發生地點'].substring(0, 3);
-        const kind = row['毒品品項'] ? row['毒品品項'].trim() : "未知";
+        const city = row.oc_addr.substring(0, 3); // 取得 "臺北市" 等前三個字
+        const kind = row.kind ? row.kind.trim() : "未知";
 
         if (!drugStats[city]) drugStats[city] = { "全部": 0 };
         if (!drugStats[city][kind]) drugStats[city][kind] = 0;
@@ -121,7 +115,17 @@ function processData(data) {
     });
 }
 
-// 監聽選單切換
+function updateLegend() {
+    const grades = [0, 5, 10, 20, 50, 100, 300];
+    const legendDiv = document.getElementById('legend');
+    legendDiv.innerHTML = "";
+    for (let i = 0; i < grades.length; i++) {
+        legendDiv.innerHTML +=
+            '<i style="background:' + getColor(grades[i] + 1) + '; width:18px; height:18px; display:inline-block; margin-right:5px; vertical-align:middle;"></i> ' +
+            grades[i] + (grades[i + 1] ? '&ndash;' + grades[i + 1] + '<br>' : '+');
+    }
+}
+
 document.getElementById('drug-select').addEventListener('change', () => {
     if (geojsonLayer) geojsonLayer.setStyle(style);
 });

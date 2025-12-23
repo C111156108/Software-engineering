@@ -2,13 +2,12 @@ body, html {
     margin: 0;
     padding: 0;
     height: 100%;
-    font-family: "Microsoft JhengHei", sans-serif;
+    font-family: "SF Pro TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
 }
 
 #map {
     height: 100vh;
     width: 100%;
-    background: #f0f0f0;
 }
 
 #control-panel {
@@ -16,37 +15,35 @@ body, html {
     top: 20px;
     left: 20px;
     z-index: 1000;
-    background: rgba(255, 255, 255, 0.9);
-    padding: 15px;
-    border-radius: 8px;
-    box-shadow: 0 0 15px rgba(0,0,0,0.2);
-    width: 250px;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    width: 240px;
 }
 
-#drug-select {
+.input-group {
+    margin: 15px 0;
+}
+
+select {
     width: 100%;
     padding: 8px;
-    margin-top: 10px;
-    border-radius: 4px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 14px;
 }
 
-#legend {
-    margin-top: 20px;
-    line-height: 24px;
+#status {
+    font-size: 12px;
+    color: #007bff;
+    margin-bottom: 10px;
+    transition: opacity 1s;
 }
 
-.legend-color {
-    width: 18px;
-    height: 18px;
-    float: left;
-    margin-right: 8px;
-    opacity: 0.8;
-}
-
-.info-box {
-    padding: 6px 8px;
-    background: white;
-    background: rgba(255,255,255,0.8);
-    box-shadow: 0 0 15px rgba(0,0,0,0.2);
-    border-radius: 5px;
+#legend-container {
+    border-top: 1px solid #eee;
+    padding-top: 10px;
+    font-size: 13px;
+    line-height: 22px;
 }
