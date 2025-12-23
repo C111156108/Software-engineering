@@ -2,8 +2,10 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <title>台灣吸菸行為監測</title>
-    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台灣吸菸行為數據監測儀表板</title>
+    <link rel="stylesheet" href="./css/style.css">
+    
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://unpkg.com/topojson@3"></script>
 </head>
@@ -11,6 +13,7 @@
     <div class="dashboard">
         <aside class="sidebar">
             <h2>📊 數據篩選</h2>
+            
             <div class="control-group">
                 <label>觀察對象</label>
                 <select id="popSelect">
@@ -19,24 +22,35 @@
                     <option value="junior">國中學生 (%)</option>
                 </select>
             </div>
+
             <div class="control-group">
                 <label>統計年份</label>
                 <select id="yearSelect"></select>
             </div>
+
             <div class="info-card">
-                <p>全台平均值</p>
+                <p id="avg-label">全台年度平均值</p>
                 <h2 id="avg-value">--</h2>
             </div>
         </aside>
+
         <main class="main-content">
-            <div id="map"></div>
-            <div class="legend">
-                <div id="legend-bar"></div>
-                <div class="legend-labels"><span>低</span><span>高</span></div>
+            <div id="map-container">
+                <div id="map"></div>
+                <div class="legend">
+                    <div id="legend-title">數據分佈</div>
+                    <div id="legend-bar"></div>
+                    <div class="legend-labels">
+                        <span>低</span>
+                        <span>高</span>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
+
     <div class="tooltip" id="tooltip"></div>
-    <script src="script.js"></script>
+
+    <script src="./js/script.js"></script>
 </body>
 </html>
