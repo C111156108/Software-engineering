@@ -23,6 +23,7 @@
 🚀 專案啟動方式
 
 由於專案涉及讀取外部 JSON 與數據檔案，直接雙擊 index.html 會因瀏覽器的安全性限制（CORS Error）而無法顯示地圖。請選擇以下任一方式啟動：
+
 方法一：VS Code - Live Server (最推薦)
 
     使用 VS Code 開啟專案資料夾。
