@@ -39,6 +39,7 @@
 python -m http.server 8000
 ```
 接著在瀏覽器輸入 http://localhost:8000 即可查看。
+
 方法三：GitHub Pages 部署
 
     將專案推送到 GitHub 儲存庫。
