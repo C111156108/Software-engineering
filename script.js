@@ -8,7 +8,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap'
 }).addTo(map);
 
-// 2. 顏色級別
+// 2. 顏色級別 (根據案件量)
 function getColor(d) {
     return d > 300 ? '#800026' :
            d > 100 ? '#BD0026' :
@@ -19,9 +19,7 @@ function getColor(d) {
 }
 
 function style(feature) {
-    // 兼容不同的 GeoJSON 欄位名 (COUNTYNAME, name, C_Name)
-    const props = feature.properties;
-    const cityName = props.COUNTYNAME || props.name || props.C_Name || "";
+    const cityName = feature.properties.COUNTYNAME || feature.properties.name || "";
     const selectedDrug = document.getElementById('drug-select').value;
     const count = (drugStats[cityName] && drugStats[cityName][selectedDrug]) || 0;
     
@@ -35,7 +33,7 @@ function style(feature) {
 async function init() {
     const statusEl = document.getElementById('status');
     
-    // A. 載入 CSV 數據
+    // A. 載入 1-16 個 CSV
     const filePromises = [];
     for (let i = 1; i <= 16; i++) {
         filePromises.push(fetchCSV(`drug_data${i}.csv`));
@@ -53,20 +51,14 @@ async function init() {
         }
     });
 
-    // B. 載入地圖 (讀取你上傳到 repo 的 taiwan.json)
+    // B. 載入並轉換地圖
     try {
         const response = await fetch('taiwan.json');
-        
-        // 檢查回應是否正常 (防止 404 HTML)
-        if (!response.ok) throw new Error(`找不到 taiwan.json (HTTP ${response.status})`);
-        
-        const contentType = response.headers.get("content-type");
-        if (!contentType || !contentType.includes("application/json")) {
-            console.error("收到的內容不是 JSON:", await response.text());
-            throw new Error("檔案格式錯誤，請確認 taiwan.json 內容是否正確");
-        }
+        if (!response.ok) throw new Error("找不到 taiwan.json");
+        const topoData = await response.json();
 
-        const geoData = await response.json();
+        // 使用 topojson-client 進行轉換
+        const geoData = topojson.feature(topoData, topoData.objects.layer1);
 
         geojsonLayer = L.geoJson(geoData, {
             style: style,
@@ -75,8 +67,7 @@ async function init() {
                     mouseover: (e) => {
                         const l = e.target;
                         l.setStyle({ weight: 3, color: '#333' });
-                        const props = feature.properties;
-                        const cityName = props.COUNTYNAME || props.name || props.C_Name || "未知";
+                        const cityName = feature.properties.COUNTYNAME || feature.properties.name || "";
                         const selected = document.getElementById('drug-select').value;
                         const count = (drugStats[cityName] && drugStats[cityName][selected]) || 0;
                         l.bindTooltip(`<b>${cityName}</b><br>${selected}: ${count} 案`).openTooltip();
@@ -92,17 +83,15 @@ async function init() {
         updateLegend();
 
     } catch (err) {
-        console.error("地圖載入失敗:", err.message);
-        statusEl.innerText = `地圖載入失敗: ${err.message}`;
+        console.error(err);
+        statusEl.innerText = "地圖載入失敗: " + err.message;
     }
 }
 
 function fetchCSV(url) {
     return new Promise((resolve) => {
         Papa.parse(url, {
-            download: true,
-            header: true,
-            skipEmptyLines: true,
+            download: true, header: true, skipEmptyLines: true,
             complete: function(results) {
                 processData(results.data);
                 resolve();
@@ -114,10 +103,10 @@ function fetchCSV(url) {
 
 function processData(data) {
     data.forEach(row => {
-        // 跳過 CSV 標頭行
         if (!row.oc_addr || row.oc_addr === "發生地點" || row.no === "編號") return;
 
-        const city = row.oc_addr.substring(0, 3);
+        // 統一將「臺」轉為「台」以匹配地圖 JSON
+        const city = row.oc_addr.substring(0, 3).replace('臺', '台');
         const kind = row.kind ? row.kind.trim() : "未知";
 
         if (!drugStats[city]) drugStats[city] = { "全部": 0 };
@@ -131,11 +120,11 @@ function processData(data) {
 
 function updateLegend() {
     const grades = [0, 10, 20, 50, 100, 300];
-    const legendDiv = document.getElementById('legend');
-    legendDiv.innerHTML = "<strong>案件量範圍</strong><br>";
+    const div = document.getElementById('legend-items');
+    div.innerHTML = "";
     for (let i = 0; i < grades.length; i++) {
-        legendDiv.innerHTML +=
-            '<i style="background:' + getColor(grades[i] + 1) + '; width:18px; height:18px; display:inline-block; margin-right:5px; vertical-align:middle;"></i> ' +
+        div.innerHTML +=
+            '<i class="legend-i" style="background:' + getColor(grades[i] + 1) + '"></i> ' +
             grades[i] + (grades[i + 1] ? '&ndash;' + grades[i + 1] + '<br>' : '+');
     }
 }

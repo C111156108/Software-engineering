@@ -1,49 +1,34 @@
 body, html {
-    margin: 0;
-    padding: 0;
-    height: 100%;
-    font-family: "SF Pro TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    margin: 0; padding: 0; height: 100%;
+    font-family: "Microsoft JhengHei", sans-serif;
 }
 
 #map {
-    height: 100vh;
-    width: 100%;
+    height: 100vh; width: 100%; z-index: 1;
 }
 
 #control-panel {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    z-index: 1000;
+    position: absolute; top: 20px; left: 20px; z-index: 1000;
     background: rgba(255, 255, 255, 0.95);
-    padding: 20px;
-    border-radius: 12px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-    width: 240px;
-}
-
-.input-group {
-    margin: 15px 0;
-}
-
-select {
-    width: 100%;
-    padding: 8px;
-    border-radius: 6px;
-    border: 1px solid #ccc;
-    font-size: 14px;
+    padding: 20px; border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    width: 220px;
 }
 
 #status {
-    font-size: 12px;
-    color: #007bff;
-    margin-bottom: 10px;
-    transition: opacity 1s;
+    font-size: 12px; color: #d9534f; margin-bottom: 10px;
 }
 
-#legend-container {
-    border-top: 1px solid #eee;
-    padding-top: 10px;
-    font-size: 13px;
-    line-height: 22px;
+select {
+    width: 100%; padding: 8px; margin: 10px 0;
+    border-radius: 5px; border: 1px solid #ccc;
+}
+
+#legend {
+    margin-top: 15px; font-size: 13px; line-height: 20px;
+}
+
+.legend-i {
+    width: 18px; height: 18px; float: left;
+    margin-right: 8px; opacity: 0.8;
 }
