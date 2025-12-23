@@ -1,14 +1,23 @@
 const width = 800, height = 750;
-const svg = d3.select("#map").append("svg").attr("viewBox", `0 0 ${width} ${height}`);
-const tooltip = d3.select("#tooltip");
+const svg = d3.select("#map").append("svg")
+    .attr("viewBox", `0 0 ${width} ${height}`)
+    .style("width", "100%")
+    .style("height", "100%");
 
+const tooltip = d3.select("#tooltip");
 const projection = d3.geoMercator().center([121, 24.3]).scale(10000).translate([width/2, height/2]);
 const path = d3.geoPath().projection(projection);
 
 let rawData = {};
 let geoData;
 
-// 載入所有資料
+// 清洗縣市名稱的通用函數
+const cleanName = (str) => {
+    if (!str) return "";
+    return str.replace("現住地縣市別=", "").replace("縣市別=", "").trim();
+};
+
+// 載入資料
 Promise.all([
     d3.json("taiwan.json"),
     d3.csv("15歲以上吸菸者每天平均吸菸支數.csv"),
@@ -20,40 +29,53 @@ Promise.all([
     
     geoData = topojson.feature(topo, topo.objects.layer1);
     
-    // 整理成人紙菸 (原本是按年排列)
+    // 1. 處理成人數據 (標準格式)
     rawData.adult_cigarette = adult_c.map(d => ({
         year: d.年度,
-        name: d.分析項目.replace("現住地縣市別=", ""),
+        name: cleanName(d.分析項目),
         overall: +d["整體吸菸者平均吸菸支數之平均值(支)"],
         male: +d["男性吸菸者平均吸菸支數之平均值(支)"],
         female: +d["女性吸菸者平均吸菸支數之平均值(支)"]
-    }));
+    })).filter(d => d.name !== "整體" && d.name !== "");
 
-    // 通用處理函數：處理橫向排列的青少年 CSV (紙菸與電子煙)
-    const processYouth = (csv, prefix, type) => {
+    // 2. 通用處理青少年 CSV (橫向轉縱向)
+    const processYouth = (csv, typeKey) => {
         let results = [];
-        let years = type === 'evape' ? ["103", "104", "105", "106"] : ["93", "94", "95", "96", "97", "98", "99", "100", "101", "102", "103", "104", "105", "107", "108", "110"];
-        
+        const cols = Object.keys(csv[0]);
+        // 抓取所有年份數字
+        const years = [...new Set(cols.map(c => c.match(/\d+/)).filter(m => m).map(m => m[0]))];
+
         csv.forEach(d => {
-            let name = (d.分析項目 || d.縣市別 || "").replace("現住地縣市別=", "").replace("縣市別=", "");
+            const name = cleanName(d.分析項目 || d.縣市別);
+            if (!name || name === "整體" || name.includes("年級")) return;
+
             years.forEach(y => {
-                let o = d[`${y}年${prefix}目前吸電子煙率(%)`] || d[`${y}年${prefix}吸菸率(%)`];
-                let m = d[`${y}年${prefix}男性學生目前吸電子煙率(%)`] || d[`${y}年${prefix}男性學生吸菸率(%)`];
-                let f = d[`${y}年${prefix}女性學生目前吸電子煙率(%)`] || d[`${y}年${prefix}女性學生吸菸率(%)`];
-                if(o !== undefined) {
-                    results.push({ year: `民國${y}年`, name, overall: +o, male: +m, female: +f });
+                // 模糊匹配欄位
+                const findVal = (genderMatch) => {
+                    const target = cols.find(c => c.includes(y) && c.includes(genderMatch) && c.includes(typeKey));
+                    return target ? +d[target] : null;
+                };
+
+                const o = findVal("學生"); // 整體學生
+                const m = findVal("男性");
+                const f = findVal("女性");
+
+                if (o !== null) {
+                    results.push({ year: `民國${y}年`, name, overall: o, male: m, female: f });
                 }
             });
         });
         return results;
     };
 
-    rawData.highschool_cigarette = processYouth(hs_c, "高中職學生");
-    rawData.junior_cigarette = processYouth(jr_c, "國中學生");
-    rawData.highschool_evape = processYouth(hs_e, "高中職學生", 'evape');
-    rawData.junior_evape = processYouth(jr_e, "國中學生", 'evape');
+    rawData.highschool_cigarette = processYouth(hs_c, "吸菸率");
+    rawData.junior_cigarette = processYouth(jr_c, "吸菸率");
+    rawData.highschool_evape = processYouth(hs_e, "電子煙率");
+    rawData.junior_evape = processYouth(jr_e, "電子煙率");
 
     init();
+}).catch(err => {
+    console.error("載入失敗，請檢查檔案名稱是否完全正確:", err);
 });
 
 function init() {
@@ -68,16 +90,17 @@ function updateUI() {
     const pop = d3.select("#popSelect").property("value");
     const prod = d3.select("#productSelect").property("value");
     
-    // 成人暫無電子煙數據，做個防呆
+    // 成人暫無電子煙 CSV 資料
     if(pop === 'adult' && prod === 'evape') {
-        alert("目前暫無成人電子煙公開細分數據，請選擇青少年族群");
+        alert("抱歉，目前上傳的資料中暫無成人電子煙細分數據。");
         d3.select("#productSelect").property("value", "cigarette");
+        updateUI();
         return;
     }
 
     const key = `${pop}_${prod}`;
     const data = rawData[key];
-    const years = Array.from(new Set(data.map(d => d.year))).sort().reverse();
+    const years = [...new Set(data.map(d => d.year))].sort().reverse();
     
     const yrSel = d3.select("#yearSelect");
     yrSel.selectAll("option").remove();
@@ -97,20 +120,22 @@ function draw() {
     const currentData = rawData[key].filter(d => d.year === year);
     const dataMap = new Map(currentData.map(d => [d.name, d[gender]]));
     
-    // 計算平均值
-    const avg = d3.mean(currentData.filter(d => d.name !== "整體"), d => d[gender]);
+    // 更新左側平均值
+    const avg = d3.mean(currentData, d => d[gender]);
     d3.select("#avg-value").text(`${avg ? avg.toFixed(2) : '--'} ${unit}`);
 
-    const colorScale = d3.scaleSequential(d3.interpolateReds)
-        .domain([0, d3.max(rawData[key], d => d[gender])]);
+    // 設定顏色深淺 (自動抓取該類別最大值)
+    const maxVal = d3.max(rawData[key], d => d[gender]) || 10;
+    const colorScale = d3.scaleSequential(d3.interpolateReds).domain([0, maxVal]);
 
     const paths = svg.selectAll(".county").data(geoData.features);
 
     paths.enter().append("path").attr("class", "county").merge(paths)
-        .transition().duration(500)
+        .transition().duration(400)
         .attr("d", path)
         .attr("fill", d => {
-            const val = dataMap.get(d.properties.COUNTYNAME) || dataMap.get(d.properties.name);
+            const name = d.properties.COUNTYNAME || d.properties.name;
+            const val = dataMap.get(name);
             return val ? colorScale(val) : "#eee";
         });
 
