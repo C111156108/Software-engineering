@@ -8,7 +8,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap'
 }).addTo(map);
 
-// 2. 顏色級別
+// 2. 顏色級別 (根據案件量)
 function getColor(d) {
     return d > 300 ? '#800026' :
            d > 100 ? '#BD0026' :
@@ -18,33 +18,29 @@ function getColor(d) {
            d > 0   ? '#FEB24C' : '#FFEDA0';
 }
 
-// 3. 樣式函式
 function style(feature) {
-    const cityName = feature.properties.COUNTYNAME || feature.properties.name;
+    // 同時相容多種 GeoJSON 的欄位名稱
+    const cityName = feature.properties.COUNTYNAME || feature.properties.name || feature.properties.C_Name;
     const selectedDrug = document.getElementById('drug-select').value;
     const count = (drugStats[cityName] && drugStats[cityName][selectedDrug]) || 0;
     
     return {
         fillColor: getColor(count),
-        weight: 1.5,
-        opacity: 1,
-        color: 'white',
-        fillOpacity: 0.7
+        weight: 1.5, opacity: 1, color: 'white', fillOpacity: 0.7
     };
 }
 
-// 4. 初始化
 async function init() {
     const statusEl = document.getElementById('status');
     
-    // A. 載入 16 個 CSV
+    // A. 載入 CSV 數據 (1-16)
     const filePromises = [];
     for (let i = 1; i <= 16; i++) {
         filePromises.push(fetchCSV(`drug_data${i}.csv`));
     }
     await Promise.all(filePromises);
     
-    // 更新下拉選單
+    // 填充下拉選單
     const select = document.getElementById('drug-select');
     Array.from(allDrugKinds).sort().forEach(kind => {
         if (kind) {
@@ -55,23 +51,13 @@ async function init() {
         }
     });
 
-    // B. 載入地圖 (改用更穩定的連結)
+    // B. 載入地圖 (優先讀取本機檔案)
     try {
-        const geoUrls = [
-            'https://raw.githubusercontent.com/chaoyuezeng/Taiwan_GeoJSON/master/Taiwan_County.json',
-            'https://cdn.jsdelivr.net/gh/g0v/twgeojson@master/json/counties.json' // 備用
-        ];
+        // 嘗試讀取你上傳到 repo 的 taiwan.json，若失敗則抓取網路備份
+        const geoResponse = await fetch('taiwan.json');
+        if (!geoResponse.ok) throw new Error('Local GeoJSON not found');
         
-        let geoRes, geoData;
-        for (let url of geoUrls) {
-            geoRes = await fetch(url);
-            if (geoRes.ok) {
-                geoData = await geoRes.json();
-                break;
-            }
-        }
-
-        if (!geoData) throw new Error("無法載入地圖邊界檔案");
+        const geoData = await geoResponse.json();
 
         geojsonLayer = L.geoJson(geoData, {
             style: style,
@@ -80,7 +66,7 @@ async function init() {
                     mouseover: (e) => {
                         const l = e.target;
                         l.setStyle({ weight: 3, color: '#333' });
-                        const cityName = feature.properties.COUNTYNAME || feature.properties.name;
+                        const cityName = feature.properties.COUNTYNAME || feature.properties.name || feature.properties.C_Name;
                         const selected = document.getElementById('drug-select').value;
                         const count = (drugStats[cityName] && drugStats[cityName][selected]) || 0;
                         l.bindTooltip(`<b>${cityName}</b><br>${selected}: ${count} 案`).openTooltip();
@@ -96,8 +82,8 @@ async function init() {
         updateLegend();
 
     } catch (err) {
-        console.error(err);
-        statusEl.innerText = "地圖載入失敗，請檢查網路連接";
+        console.error("地圖載入失敗:", err);
+        statusEl.innerText = "地圖檔案載入失敗，請確認資料夾中有 taiwan.json";
     }
 }
 
@@ -111,14 +97,14 @@ function fetchCSV(url) {
                 processData(results.data);
                 resolve();
             },
-            error: function() { resolve(); }
+            error: function() { resolve(); } 
         });
     });
 }
 
 function processData(data) {
     data.forEach(row => {
-        // 關鍵修正：跳過雙標頭中的第二行 (中文說明行)
+        // 跳過 CSV 標頭行 (英文標頭 no, type 或 中文標頭 編號, 案類)
         if (!row.oc_addr || row.oc_addr === "發生地點" || row.no === "編號") return;
 
         const city = row.oc_addr.substring(0, 3);
@@ -139,17 +125,14 @@ function updateLegend() {
     legendDiv.innerHTML = "<strong>案件量範圍</strong><br>";
     for (let i = 0; i < grades.length; i++) {
         legendDiv.innerHTML +=
-            '<i style="background:' + getColor(grades[i] + 1) + '"></i> ' +
+            '<i style="background:' + getColor(grades[i] + 1) + '; width:18px; height:18px; display:inline-block; margin-right:5px;"></i> ' +
             grades[i] + (grades[i + 1] ? '&ndash;' + grades[i + 1] + '<br>' : '+');
     }
 }
 
-// 監聽選單切換，增加安全性檢查
 document.getElementById('drug-select').addEventListener('change', () => {
     if (geojsonLayer) {
         geojsonLayer.setStyle(style);
-    } else {
-        console.warn("地圖圖層尚未準備好");
     }
 });
 
