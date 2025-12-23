@@ -2,20 +2,28 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>台灣毒品案件分佈統計地圖</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台灣毒品案件分佈監測地圖</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
     <div id="control-panel">
-        <h3>毒品分佈監測</h3>
-        <label>選擇毒品種類：</label>
-        <select id="drug-select">
-            <option value="全部">全部顯示</option>
-        </select>
-        <div id="status"></div>
+        <h2>毒品分佈監測</h2>
+        <div class="filter-group">
+            <label for="drug-select">篩選毒品種類：</label>
+            <select id="drug-select">
+                <option value="全部">全部顯示</option>
+            </select>
+        </div>
+        <div id="status-box">
+            <p id="status-text">準備載入資料...</p>
+            <div id="progress-bar"><div id="progress-fill"></div></div>
+        </div>
+        <div id="summary"></div>
     </div>
-    
+
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
